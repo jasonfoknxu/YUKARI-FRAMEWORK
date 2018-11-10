@@ -5,7 +5,7 @@
  *
  * 为小缘粉丝俱乐部 YUKARI FAN CLUB 而设计的 PHP 框架
  *
- * @version 1.0.3
+ * @version 1.0.5
  * @author yukari.top admin@yukari.top
  */
 class yukari {
@@ -30,6 +30,14 @@ class yukari {
      */
     public $debug = false;
     /**
+     * @var string 延迟加载CSS（默认：不启用）
+     */
+    private $deferCSS = false;
+    /**
+     * @var string 图片文件夹路径
+     */
+    private $imgDir = 'images';
+    /**
      * @var string CSS文件夹路径
      */
     private $cssDir = 'styles';
@@ -38,7 +46,7 @@ class yukari {
      */
     private $jsDir = 'scripts';
 
-    private $css, $js, $jsVar, $inlineJS, $nav, $slides, $cards, $processResult;
+    private $css, $js, $jsVar, $inlineJS, $nav, $slides, $cards, $processResult, $globalMessage, $randomImage;
 
     /**
      * constructor
@@ -181,9 +189,9 @@ class yukari {
      *
      * @param null|string $file CSS文件名 (不用后缀 *.min.css)（默认：已加入的 CSS）
      * @param false|string $ver 版本号 （默认：当前日期）
-     * @param bool $defer 延迟加载（默认：使用延迟加载）
      */
-    function printCSS($file='', $ver=_DATE_, $defer=true) {
+    function printCSS($file='', $ver=_DATE_) {
+        $defer = $this->deferCSS;
         if ($defer)
             echo '<noscript id="deferred-styles">';
         if (!empty($file)) {
@@ -196,6 +204,19 @@ class yukari {
         }
         if ($defer)
             echo '</noscript>';
+    }
+
+    /**
+     * 启用/关闭延迟加载CSS
+     *
+     * @param bool $enable 启用/关闭
+     * @return bool 延迟加载CSS
+     */
+    function deferCSS($enable=true) {
+        $this->deferCSS = $enable;
+        if ($enable)
+            $this->addJS('deferCSS','1.0.3');
+        return $enable;
     }
 
     /**
@@ -274,6 +295,20 @@ class yukari {
             file_put_contents($groupedJSpath, "/*$JSremark*/".PHP_EOL.$combinedJS);
         }
         $this->js = array(array("name" => "$groupedFilename", "version" => $version, "asyncDefer" => $asyncDefer));
+    }
+
+    /**
+     *清除已加入的 CSS
+     */
+    function clearCSS() {
+        $this->css = array();
+    }
+
+    /**
+     *清除已加入的 JS
+     */
+    function clearJS() {
+        $this->js = array();
     }
 
     /**
@@ -490,7 +525,7 @@ class yukari {
             //$addClass = $title;
         }
         foreach ($cards as $card) {
-            echo '<div class="col-4 col-sm-4 col-md-3 col-lg-3 col-xl-2 px-1 px-md-2 mx-md-auto my-1 my-md-3"><div class="card h-100 '.$card[4].'"><div class="view overlay text-center h-100"><img class="card-img-top" src="images/icons/'.$card[1].'.png" alt="'.$card[0].'" title="'.$card[0].'" /><div class="card-body text-center grey lighten-3 px-1 px-md-2 px-lg-3 h-100"><h4 class="h4-responsive card-title">'.$card[0].'</h4><p class="card-text">'.$card[2].'</p></div><a href="'.$card[3].'" target="_blank"><div class="mask waves-effect rgba-pink-slight"></div></a></div></div></div>';
+            echo '<div class="col-4 col-sm-4 col-md-3 col-lg-3 col-xl-2 px-1 px-md-2 mx-md-auto my-1 my-md-3"><div class="card h-100 '.$card[4].'"><div class="view overlay text-center h-100"><img class="card-img-top" src="'.$this->path.$this->imgDir.'/icons/'.$card[1].'.png" alt="'.$card[0].'" title="'.$card[0].'" /><div class="card-body text-center grey lighten-3 px-1 px-md-2 px-lg-3 h-100"><h4 class="h4-responsive card-title">'.$card[0].'</h4><p class="card-text">'.$card[2].'</p></div><a href="'.$card[3].'" target="_blank"><div class="mask waves-effect rgba-pink-slight"></div></a></div></div></div>';
         }
 
     }
@@ -539,6 +574,39 @@ class yukari {
         }
         $HTML .= '</div></div></div>';
         return $HTML;
+    }
+
+    /**
+     * 加入全局通知
+     *
+     * @param string $content 通知內容
+     * @param string $class （可选）通知 CSS class
+     */
+    function addGlobalMessage($content, $class='') {
+        $this->globalMessage[] = array('content'=>$content, 'class'=>$class);
+    }
+
+    /**
+     * 页面加入全局通知
+     *
+     * @param string $content 通知內容（默认：已加入的全局通知）
+     * @param string $class （可选）通知 CSS class（默认：primary）
+     */
+    function printGlobalMessage($content='', $class='') {
+        if (!empty($content)) {
+            $msg = array(array('content'=>$content, 'class'=>$class));
+        } else {
+            $msg = $this->globalMessage;
+        }
+        $HTML = '';
+        if (!empty($msg)) {
+            foreach ($msg as $m) {
+                if (empty($m['class']))
+                    $m['class'] = 'primary';
+                $HTML .= '<div class="alert alert-' . $m['class'] . ' m-0 text-center h4" role="alert">' . $m['content'] . '</div>';
+            }
+        }
+        echo $HTML;
     }
 
     /**
@@ -706,6 +774,28 @@ class yukari {
         return '';
     }
 
-}
-?>
+    /**
+     * 加入随机图片
+     *
+     * @param string $path 图片路径
+     * @param string $title （可选）图片标题
+     */
+    function addRandomImage($path, $title='') {
+        $this->randomImage[] = array('path'=>$path,'title'=>$title);
+    }
 
+    /**
+     * 页面加入随机图片
+     *
+     * @todo 支持图片标题
+     * @todo 支持自定数量
+     */
+    function printRandomImage(/*$num=1*/) {
+        $random = array_rand($this->randomImage, 1);
+        echo $this->randomImage[$random]['path'];
+        /*foreach ($random as $r) {
+            echo $r['path'];
+        }*/
+    }
+
+}
