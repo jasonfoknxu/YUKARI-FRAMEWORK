@@ -14,6 +14,10 @@ class yukari {
      */
     public $page = '';
     /**
+     * @var string 目前分面
+     */
+    public $subpage = '';
+    /**
      * @var string include的页面
      */
     public $include = '';
@@ -45,6 +49,10 @@ class yukari {
      * @var string JS文件夹路径
      */
     private $jsDir = 'scripts';
+    /**
+     * @var array 全局变量
+     */
+    private $var = array();
 
     private $css, $js, $jsVar, $inlineJS, $nav, $slides, $cards, $processResult, $globalMessage, $randomImage;
 
@@ -117,6 +125,16 @@ class yukari {
             $this->debugMsg("INCLUDE SITE FAIL: $path");
         }
         return false;
+    }
+
+    /**
+     * 跳转到指定链接（只能在 page.php 中使用）
+     *
+     * @param string $URL 跳转到的链接
+     */
+    function redirect($URL) {
+        header('Location: '.$URL);
+        exit();
     }
 
     /**
@@ -475,12 +493,18 @@ class yukari {
             $this->slides = array();
         }
         $numOfSlides = count($slides);
-        echo '<div id="'.$id.'" class="carousel slide carousel-fade" data-ride="carousel"><ol class="carousel-indicators">';
-        for ($i=0;$i<$numOfSlides;$i++) {
-            $class = ($i==0) ? 'class="active"':'';
-            echo '<li data-target="#'.$id.'" data-slide-to="'.$i.'" '.$class.'></li>';
+        echo '<div id="'.$id.'" class="carousel slide carousel-fade" data-ride="carousel">';
+
+        if ($numOfSlides > 1) {
+            echo '<ol class="carousel-indicators">';
+            for ($i = 0; $i < $numOfSlides; $i++) {
+                $class = ($i == 0) ? 'class="active"' : '';
+                echo '<li data-target="#' . $id . '" data-slide-to="' . $i . '" ' . $class . '></li>';
+            }
+            echo '</ol>';
         }
-        echo '</ol><div class="carousel-inner">';
+
+        echo '<div class="carousel-inner">';
         $first = true;
         foreach ($slides as $slide) {
             $openInNewTab = ($slide[4]) ? 'target="_blank"' : '';
@@ -489,7 +513,9 @@ class yukari {
                 $class = 'active';
                 $first = false;
             }
-            echo '<div class="carousel-item '.$class.'"><a href="'.$slide[1].'" '.$openInNewTab.'>';
+            echo '<div class="carousel-item '.$class.'">';
+            if (!empty($slide[1]))
+                echo '<a href="'.$slide[1].'" '.$openInNewTab.'>';
             if (!empty($slide[2])) { // 有标题
                 //echo '<div class="view"><img class="d-block w-100" src="'.$slide[0].'" alt="'.$slide[2].'"><div class="mask rgba-black-light"></div></div><div class="carousel-caption"><h1 class="h1-responsive">'.$slide[2].'</h1><p>'.$slide[3].'</p></div>';
                 echo '<div class="view"><div class="d-block w-100 slide-image" style="background-image:url('."$slide[0]".');"></div><div class="mask rgba-black-light"></div></div><div class="carousel-caption"><h1 class="h1-responsive">'.$slide[2].'</h1><p class="h3-responsive">'.$slide[3].'</p></div>';
@@ -497,9 +523,14 @@ class yukari {
                 //echo '<img class="d-block w-100" src="'.$slide[0].'" alt="'.$slide[2].'">';
                 echo '<div class="d-block w-100 slide-image" style="background-image:url('."$slide[0]".');"></div>';
             }
-            echo '</a></div>';
+            if (!empty($slide[1]))
+                echo '</a>';
+            echo '</div>';
         }
-        echo '</div><a class="carousel-control-prev" href="#'.$id.'" role="button" data-slide="prev"><i class="fas fa-chevron-left fa-3x" aria-hidden="true"></i><span class="sr-only">上一页</span></a><a class="carousel-control-next" href="#'.$id.'" role="button" data-slide="next"><i class="fas fa-chevron-right fa-3x" aria-hidden="true"></i><span class="sr-only">下一页</span></a></div>';
+        echo '</div>';
+        if ($numOfSlides>1)
+            echo '<a class="carousel-control-prev" href="#'.$id.'" role="button" data-slide="prev"><i class="fas fa-chevron-left fa-3x" aria-hidden="true"></i><span class="sr-only">上一页</span></a><a class="carousel-control-next" href="#'.$id.'" role="button" data-slide="next"><i class="fas fa-chevron-right fa-3x" aria-hidden="true"></i><span class="sr-only">下一页</span></a>';
+        echo '</div>';
     }
 
     /**
@@ -511,11 +542,21 @@ class yukari {
      * @param string $url 目标URL
      * @param string $addClass （可选）额外的 CSS class
      */
-    function addCard($title, $icon, $description, $url, $addClass='') {// Title, Icon, Description, URL
+    function addCard($title, $icon, $description, $url, $addClass='') {
         $this->cards[] = array($title, $icon, $description, $url, $addClass);
     }
 
-    function printCards($title='', $icon='', $description='', $url='', $addClass='') {
+    /**
+     * 返回卡片HTML
+     *
+     * @param string $title （可选）卡片标题
+     * @param string $icon （可选）卡片图片
+     * @param string $description （可选）卡片描述
+     * @param string $url （可选）目标URL
+     * @param string $addClass （可选）额外的 CSS class
+     * @return string 卡片HTML
+     */
+    function returnCards($title='', $icon='', $description='', $url='', $addClass='') {
         $addClass = '';
         if (!empty($title) && !empty($description)) {
             $cards = array($title, $icon, $description, $url, $addClass);
@@ -524,10 +565,24 @@ class yukari {
             $this->cards = array();
             //$addClass = $title;
         }
+        $HTML = '';
         foreach ($cards as $card) {
-            echo '<div class="col-4 col-sm-4 col-md-3 col-lg-3 col-xl-2 px-1 px-md-2 mx-md-auto my-1 my-md-3"><div class="card h-100 '.$card[4].'"><div class="view overlay text-center h-100"><img class="card-img-top" src="'.$this->path.$this->imgDir.'/icons/'.$card[1].'.png" alt="'.$card[0].'" title="'.$card[0].'" /><div class="card-body text-center grey lighten-3 px-1 px-md-2 px-lg-3 h-100"><h4 class="h4-responsive card-title">'.$card[0].'</h4><p class="card-text">'.$card[2].'</p></div><a href="'.$card[3].'" target="_blank"><div class="mask waves-effect rgba-pink-slight"></div></a></div></div></div>';
+            $HTML .= '<div class="col-4 col-sm-4 col-md-3 col-lg-3 col-xl-2 px-1 px-md-2 mx-md-auto my-1 my-md-3"><div class="card h-100 '.$card[4].'"><div class="view overlay text-center h-100"><img class="card-img-top" src="'.$this->path.$this->imgDir.'/icons/'.$card[1].'.png" alt="'.$card[0].'" title="'.$card[0].'" /><div class="card-body text-center grey lighten-3 px-1 px-md-2 px-lg-3 h-100"><h4 class="h4-responsive card-title">'.$card[0].'</h4><p class="card-text">'.$card[2].'</p></div><a href="'.$card[3].'" target="_blank"><div class="mask waves-effect rgba-pink-slight"></div></a></div></div></div>';
         }
+        return $HTML;
+    }
 
+    /**
+     * 页面加入卡片
+     *
+     * @param string $title （可选）卡片标题
+     * @param string $icon （可选）卡片图片
+     * @param string $description （可选）卡片描述
+     * @param string $url （可选）目标URL
+     * @param string $addClass （可选）额外的 CSS class
+     */
+    function printCards($title='', $icon='', $description='', $url='', $addClass='') {
+        echo $this->returnCards($title, $icon, $description, $url, $addClass);
     }
 
     /**
@@ -676,6 +731,34 @@ class yukari {
     }
 
     /**
+     * 编码 $_GET/$_POST 的內容
+     *
+     * @param string $value 要编码的內容
+     * @return string 编码后的字符串
+     */
+    function _encode($value) {
+        return htmlentities($value);
+    }
+
+    /**
+     * 设置/取得全局变量
+     *
+     * @param string $name 变量名
+     * @param mixed $val 设置变量值
+     * @return mixed 变量值
+     */
+    function _var($name, $val='') {
+        if ($val !== '') {
+            $this->var[$name] = $val;
+            return $val;
+        } else {
+            if (isset($this->var[$name]))
+                return $this->var[$name];
+        }
+        return '';
+    }
+
+    /**
      * 缘历活动日期
      *
      * @param int $eventID 缘历活动ID
@@ -796,6 +879,119 @@ class yukari {
         /*foreach ($random as $r) {
             echo $r['path'];
         }*/
+    }
+
+    /**
+     * 歌曲资料
+     *
+     * @param int $id 歌曲ID
+     * @return string 歌曲资料HTML
+     * @uses core: song
+     */
+    function songInfo($id) {
+        $this->inc('yukari/core/song.php',true);
+        $SONG = new song();
+        $info = $SONG->getSongWithSubmit($id);
+        $table = '';
+        if (!empty($info)) {
+            $table .= '<table class="table">';
+            $table .= '<tr><td>歌名</td><td><h1 class="h1-responsive">'.$info['name'].'</h1></td></tr>';
+            if (!empty($info['zh_name']))
+                $table .= '<tr><td>中文歌名</td><td><h1 class="h1-responsive">'.$info['zh_name'].'</h1></td></tr>';
+            if (!empty($info['singer']))
+                $table .= '<tr><td>原唱</td><td>'.$info['singer'].'</td></tr>';
+            $lastSing = $SONG->lastSing($id);
+            if (empty($lastSing['date'])) {
+                $lastSingText = "在{$SONG->noSingRecordMonths()}个月里没有唱过。";
+            } else {
+                $lastSingText = '（';
+                if ($lastSing['days']<1) {
+                    $lastSingText .= "刚刚才唱过这首歌。";
+                } else {
+                    $lastSingText .= "距离上次唱这首歌已经有";
+                    if (!empty($lastSing['year']))
+                        $lastSingText .= "{$lastSing['year']}年";
+                    if (!empty($lastSing['month']))
+                        $lastSingText .= "{$lastSing['month']}个月";
+                    if (!empty($lastSing['day']))
+                        $lastSingText .= "{$lastSing['day']}天";
+                    $lastSingText .= "了。";
+                }
+                $lastSingText .= '）<br />';
+                $lastSingText .= DateTime::createFromFormat('Y-m-d', $lastSing['date'])->format('Y 年 n 月 j 日');
+
+                $lastSing2 = $SONG->lastSing($id,1);
+                if (!empty($lastSing2))
+                    $lastSingText .= "<br />".DateTime::createFromFormat('Y-m-d', $lastSing2['date'])->format('Y 年 n 月 j 日');
+                $lastSing3 = $SONG->lastSing($id,2);
+                if (!empty($lastSing3))
+                    $lastSingText .= "<br />".DateTime::createFromFormat('Y-m-d', $lastSing3['date'])->format('Y 年 n 月 j 日');
+            }
+            $lastSingText .= '<br /><a href="'.$this->path.'songlist/?search='.$info['name'].'" target="_blank" class="btn btn-primary btn-lg">搜索歌单'.$this->icon('fa fa-search','ml-1').'</a>';
+            $table .= '<tr><td>最近３次演唱</td><td>'.$lastSingText.'</td></tr>';
+            if (!empty($info['date'])) {
+                $submitTime = DateTime::createFromFormat('Y-m-d H:i:s', $info['date'])->format('Y 年 n 月 j 日');
+                $table .= '<tr><td>投稿时间</td><td>'.$submitTime.'</td></tr>';
+            }
+            if (!empty($info['cover'])) {
+                $table .= '<tr><td>投稿封面</td><td><img src="'.$this->path.'yukari/img/vdo/cover/' . $info['cover'] . '" alt="' . $info['title'] . '" class="song-cover" /></td></tr>';
+            }
+            if (!empty($info['description'])) {
+                $table .= '<tr><td>投稿简介</td><td><h4 class="h4-responsive">'.$info['title'].'</h4>'.$info['description'].'</td></tr>';
+            }
+            if (!empty($info['image'])) {
+                $table .= '<tr><td>投稿预览</td><td><img src="'.$this->path.'yukari/img/vdo/' . $info['image'] . '" alt="' . $info['title'] . '" /></tr>';
+            }
+            if (!empty($info['bilibili'])) {
+                if (strpos($info['bilibili'], '-') !== false) {
+                    $str = explode("-", $info['bilibili']);
+                    $URL = "http://www.bilibili.com/video/av{$str[0]}/index_{$str[1]}.html";
+                } else {
+                    $URL = "http://www.bilibili.com/video/av{$info['bilibili']}/";
+                }
+                $this->addCard('bilibili', 'bilibili', '' ,$URL);
+            }
+            if (!empty($info['music163mv'])) {
+                $URL = "http://music.163.com/#/mv/{$info['music163mv']}/";
+                $this->addCard('网易云音乐视频', 'music163', '' ,$URL);
+            }
+            if (!empty($info['music163'])) {
+                $URL = "http://music.163.com/#/program/{$info['music163']}/";
+                $this->addCard('网易云音乐', 'music163', '' ,$URL);
+            }
+            if (!empty($info['5sing'])) {
+                if (strpos($info['5sing'], '-') !== false) {
+                    $str = explode("-", $info['5sing']);
+                    $URL = "http://5sing.kugou.com/{$str[0]}/{$str[1]}.html";
+                } else {
+                    $URL = "http://5sing.kugou.com/fc/{$info['5sing']}.html";
+                }
+                $this->addCard('5SING', '5sing', '' ,$URL);
+            }
+            if (!empty($info['douyu'])) {
+                $URL = "https://v.douyu.com/show/{$info['douyu']}";
+                $this->addCard('斗鱼视频', 'douyu', '' ,$URL);
+            }
+            if (!empty($info['acfun'])) {
+                if (strpos($info['acfun'], '-') !== false) {
+                    $str = explode("-", $info['acfun']);
+                    $URL = "http://www.acfun.cn/v/ac{$str[0]}_{$str[1]}";
+                } else {
+                    $URL = "http://www.acfun.cn/v/ac{$info['acfun']}";
+                }
+                $this->addCard('AcFun', 'acfun', '' ,$URL);
+            }
+            if (!empty($info['youtube'])) {
+                $URL = "https://www.youtube.com/watch?v={$info['youtube']}";
+                $this->addCard('YouTube', 'youtube', '' ,$URL);
+            }
+            $playCards = $this->returnCards();
+            if (!empty($playCards)) {
+                $table .= '<tr><td>播放</td><td><div class="row text-center mt-3 follow">'.$playCards.'</div></td></tr>';
+            }
+            $table .= '</table>';
+        }
+        return $table;
     }
 
 }
